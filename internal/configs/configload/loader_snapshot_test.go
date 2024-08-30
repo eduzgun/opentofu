@@ -48,7 +48,7 @@ func TestLoadConfigWithSnapshot(t *testing.T) {
 		}
 
 		for key, module := range wantModuleDirs {
-			wantModuleDirs[key] = filepath.Join(module)
+			wantModuleDirs[key] = filepath.Clean(module)
 		}
 		problems := deep.Equal(wantModuleDirs, gotModuleDirs)
 		for _, problem := range problems {
