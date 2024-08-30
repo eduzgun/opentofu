@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -83,4 +84,39 @@ func testOpenTofuProvidersMirror(t *testing.T, fixture string) {
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("unexpected files in result\n%s", diff)
 	}
+}
+func TestTofuProvidersMirrorBrokenLockFile(t *testing.T) {
+	skipIfCannotAccessNetwork(t)
+
+	outputDir := t.TempDir()
+	t.Logf("creating mirror dir in %s", outputDir)
+
+	fixtureDir := "tofu-providers-mirror-with-lock-file"
+	fixturePath := filepath.Join("testdata", fixtureDir)
+
+	lockFilePath := filepath.Join(fixturePath, ".terraform.lock.hcl")
+	lockFileContents, err := os.ReadFile(lockFilePath)
+	if err != nil {
+		t.Fatalf("Failed to read lock file %s", err)
+	}
+
+	modifiedContents := strings.ReplaceAll(string(lockFileContents), "hashicorp/template", "hashicorp/templateee")
+	if err := os.WriteFile(lockFilePath, []byte(modifiedContents), 0644); err != nil {
+		t.Fatalf("Failed to write modified lock file: %s", err)
+	}
+	tf := e2e.NewBinary(t, tofuBin, fixturePath)
+
+	stdout, stderr, err := tf.Run("providers", "mirror", "-platform=linux_amd64", outputDir)
+	if err == nil {
+		t.Fatalf("expected error got\n stderr: %s\n stdout: %s", stderr, stdout)
+	}
+
+	if !strings.Contains(stderr, "No such provider found in dependency lock file") {
+		t.Fatalf("Expected error message 'No such provider found in dependency lock file' got %s", stderr)
+	}
+	t.Cleanup(func() {
+		if err := os.WriteFile(lockFilePath, []byte(lockFileContents), 0644); err != nil {
+			t.Fatalf("Failed to write modified lock file: %s", err)
+		}
+	})
 }

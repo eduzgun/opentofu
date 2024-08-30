@@ -164,6 +164,14 @@ func (c *ProvidersMirrorCommand) Run(args []string) int {
 		}
 		selected := candidates.Newest()
 		if !lockedDeps.Empty() {
+			if lockedDeps.Provider(provider) == nil {
+				diags = diags.Append(tfdiags.Sourceless(
+					tfdiags.Error,
+					"No such provider found in dependency lock file",
+					fmt.Sprintf("Provider %s cannot be found in the dependency lock file", provider),
+				))
+				continue
+			}
 			selected = lockedDeps.Provider(provider).Version()
 			c.Ui.Output(fmt.Sprintf("  - Selected v%s to match dependency lock file", selected.String()))
 		} else if len(constraintsStr) > 0 {
